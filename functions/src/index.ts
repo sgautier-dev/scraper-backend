@@ -8,15 +8,60 @@
  */
 
 import { onRequest } from "firebase-functions/v2/https";
-import * as logger from "firebase-functions/logger";
+import { adminDb } from "./firebaseAdmin";
+import * as admin from "firebase-admin";
 
 // Start writing functions
 // https://firebase.google.com/docs/functions/typescript
 
-export const onScraperComplete = onRequest((request, response) => {
+const fetchResults: any = async (id: string) => {
+	const apiKey = process.env.BRIGHTDATA_API_KEY;
+
+	const res = await fetch(`https://api.brightdata.com/dca/dataset?id=${id}`, {
+		method: "GET",
+		headers: {
+			Authorization: `Bearer ${apiKey}`,
+		},
+	});
+	const data = await res.json();
+	if (data.status === "building" || data.status === "collecting") {
+		console.log("Not complete yet, trying again...");
+		return fetchResults(id);
+	}
+	return data;
+};
+
+export const onScraperComplete = onRequest(async (request, response) => {
 	console.log("SCRAPE COMPLETE: ", request.body);
-	logger.info("Hello logs!", { structuredData: true });
-	response.send("Hello from Firebase!");
+
+	const { success, id } = request.body;
+
+	if (!success) {
+		await adminDb.collection("searches").doc(id).set(
+			{
+				status: "error",
+				updatedAt: admin.firestore.Timestamp.now(),
+			},
+			{
+				merge: true,
+			}
+		);
+	}
+
+	const data = await fetchResults(id);
+
+	await adminDb.collection("searches").doc(id).set(
+		{
+			status: "complete",
+			updatedAt: admin.firestore.Timestamp.now(),
+			results: data,
+		},
+		{
+			merge: true,
+		}
+	);
+
+	response.send("onScraperComplete finished!");
 });
 
 // creating a ngrok tunnel
