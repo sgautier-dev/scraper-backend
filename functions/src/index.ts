@@ -9,7 +9,8 @@
 
 import { onRequest } from "firebase-functions/v2/https";
 import { adminDb } from "./firebaseAdmin";
-import * as admin from "firebase-admin";
+// import * as admin from "firebase-admin";
+import { Timestamp } from "firebase-admin/firestore";
 
 // Start writing functions
 // https://firebase.google.com/docs/functions/typescript
@@ -23,7 +24,20 @@ const fetchResults: any = async (id: string) => {
 			Authorization: `Bearer ${apiKey}`,
 		},
 	});
-	const data = await res.json();
+
+	// console.log("Raw response:", await res.text());
+
+	let data;
+	if (res.ok) {
+		try {
+			data = await res.json();
+		} catch (e) {
+			console.error("Could not parse JSON:", e);
+		}
+	} else {
+		console.error("Fetch was not successful:", res.status);
+	}
+
 	if (data.status === "building" || data.status === "collecting") {
 		console.log("Not complete yet, trying again...");
 		return fetchResults(id);
@@ -40,7 +54,7 @@ export const onScraperComplete = onRequest(async (request, response) => {
 		await adminDb.collection("searches").doc(id).set(
 			{
 				status: "error",
-				updatedAt: admin.firestore.Timestamp.now(),
+				updatedAt: Timestamp.now(),
 			},
 			{
 				merge: true,
@@ -53,7 +67,7 @@ export const onScraperComplete = onRequest(async (request, response) => {
 	await adminDb.collection("searches").doc(id).set(
 		{
 			status: "complete",
-			updatedAt: admin.firestore.Timestamp.now(),
+			updatedAt: Timestamp.now(),
 			results: data,
 		},
 		{
@@ -66,4 +80,4 @@ export const onScraperComplete = onRequest(async (request, response) => {
 
 // creating a ngrok tunnel
 // on the terminal: ngrok http 5001
-// https://155e-165-169-98-136.ngrok-free.app/data-scraper-8a73c/us-central1/onScraperComplete
+// https://f17f-165-169-98-136.ngrok-free.app/data-scraper-8a73c/us-central1/onScraperComplete
