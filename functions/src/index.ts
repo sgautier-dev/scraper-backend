@@ -15,7 +15,27 @@ import { Timestamp } from "firebase-admin/firestore";
 // Start writing functions
 // https://firebase.google.com/docs/functions/typescript
 
-const fetchResults: any = async (id: string) => {
+type FetchResult = {
+	id: string;
+	collector_id: string;
+	trigger: {
+		type: string;
+		user: string;
+		ip: string;
+	};
+	inputs: number;
+	page_loads: number;
+	data_lines: number;
+	failed_pages: number;
+	total_pages: number;
+	created: string;
+	finished: string;
+	dataset_file: string;
+	success: boolean;
+	status?: string;
+};
+
+const fetchResults = async (id: string): Promise<FetchResult | null> => {
 	const apiKey = process.env.BRIGHTDATA_API_KEY;
 
 	const res = await fetch(`https://api.brightdata.com/dca/dataset?id=${id}`, {
